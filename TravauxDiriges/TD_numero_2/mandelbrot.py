@@ -5,7 +5,13 @@ from PIL import Image
 from math import log
 from time import time
 import matplotlib.cm
+from mpi4py import MPI
 
+
+globCom = MPI.COMM_WORLD.Dup()
+nbp     = globCom.size
+rank    = globCom.rank
+name    = MPI.Get_processor_name()
 
 @dataclass
 class MandelbrotSet:
