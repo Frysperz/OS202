@@ -7,11 +7,12 @@ from time import time
 import matplotlib.cm
 from mpi4py import MPI
 
-
 globCom = MPI.COMM_WORLD.Dup()
 nbp     = globCom.size
 rank    = globCom.rank
 name    = MPI.Get_processor_name()
+
+root = 0
 
 @dataclass
 class MandelbrotSet:
@@ -59,19 +60,51 @@ width, height = 1024, 1024
 
 scaleX = 3./width
 scaleY = 2.25/height
-convergence = np.empty((width, height), dtype=np.double)
 # Calcul de l'ensemble de mandelbrot :
 deb = time()
-for y in range(height):
-    for x in range(width):
-        c = complex(-2. + scaleX*x, -1.125 + scaleY * y)
-        convergence[x, y] = mandelbrot_set.convergence(c, smooth=True)
+
+h=height//nbp
+
+for r in range(1,nbp-1) :
+    if rank == r :
+        convergence = np.empty((width, height), dtype=np.double)
+        for y in range(r*h,(r+1)*h):
+            for x in range(width):
+                c = complex(-2. + scaleX*x, -1.125 + scaleY * y)
+                convergence[x, y] = mandelbrot_set.convergence(c, smooth=True)
+        globCom.send(convergence, dest=root, tag=r)
+                    
+if rank == nbp-1 :
+        convergence = np.empty((width, height), dtype=np.double)
+        for y in range((nbp-1)*h,height):
+            for x in range(width):
+                c = complex(-2. + scaleX*x, -1.125 + scaleY * y)
+                convergence[x, y] = mandelbrot_set.convergence(c, smooth=True)
+        globCom.send(convergence, dest=root, tag=nbp-1)
+            
+if rank == 0 :
+    convergence_finale = np.empty((width, height), dtype=np.double)
+    for y in range(h):
+            for x in range(width):
+                c = complex(-2. + scaleX*x, -1.125 + scaleY * y)
+                convergence_finale[x, y] = mandelbrot_set.convergence(c, smooth=True)
+    for r in range(1,nbp-1) :
+        convergence = globCom.recv(source=r, tag=r)
+        convergence_finale[:,r*h:(r+1)*h-1] = convergence[:,r*h:(r+1)*h-1]
+    
+    convergence = globCom.recv(source=nbp-1, tag=nbp-1)
+    convergence_finale[:,(nbp-1)*h:height] = convergence[:,(nbp-1)*h:height]
+
+
 fin = time()
 print(f"Temps du calcul de l'ensemble de Mandelbrot : {fin-deb}")
 
 # Constitution de l'image résultante :
 deb = time()
-image = Image.fromarray(np.uint8(matplotlib.cm.plasma(convergence.T)*255))
-fin = time()
-print(f"Temps de constitution de l'image : {fin-deb}")
-image.show()
+if rank == 0 :    
+    image = Image.fromarray(np.uint8(matplotlib.cm.plasma(convergence_finale.T)*255))
+    fin = time()
+    print(f"Temps de constitution de l'image : {fin-deb}")
+    image.show()
+# On enregistre l'image dans le dossier car je n'arrive pas à l'afficher autrement.
+    image.save("IMAGE.png")
