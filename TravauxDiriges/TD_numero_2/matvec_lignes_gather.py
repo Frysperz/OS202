@@ -29,8 +29,7 @@ for k in range(dim):
 
 
 recvbuf = np.zeros(dim) 
-globCom.Gather(v, recvbuf, root=0)
+globCom.Allgather(v, recvbuf)
 
-if rank==0:
-    print("A.u = ",np.array(recvbuf))
+print("A.u = ",np.array(recvbuf))
 
