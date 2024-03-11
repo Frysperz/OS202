@@ -231,7 +231,8 @@ if __name__ == "__main__":
     size = comm.Get_size()
     rank = comm.Get_rank()
 
-    pg.init()
+    if rank==0:
+        pg.init()
 
     # Initialisation des variables globales
     size_laby = 25, 25
@@ -268,7 +269,7 @@ if __name__ == "__main__":
             comm.send(global_colony.seeds, dest=i, tag=7)
 
     # Initialisation de la colonie pour chaque processus
-    # On définit une colonie local avec local_ants_count mais il faut faire attention à changer les seeds car sinon les 52 fourmis du proc1 auront les mêmes seeds et donc les mêmes max_life que les 52 fourmis du proc2 par exemple, ce qu'on ne veut pas.
+    # On définit une colonie locale avec local_ants_count mais il faut faire attention à changer les seeds car sinon les 51 fourmis du proc1 auront les mêmes seeds et donc les mêmes max_life que les 51 fourmis du proc2 par exemple, ce qu'on ne veut pas.
     if rank != 0:
         start_ant, end_ant = distribute_ants(nb_ants, size, rank)
         local_ants_count = end_ant - start_ant
@@ -277,7 +278,7 @@ if __name__ == "__main__":
         local_colony.seeds = data_global_colony[start_ant:end_ant]
         # print(f"le processus {rank} s'occupe de {local_colony.directions.shape[0]} fourmis\n")
 
-    # Initialisation du labyrinthe pour chaque processus
+    # Initialisation du labyrinthe et des phéromones pour chaque processus
     a_maze = maze.Maze(size_laby, 12345, rank)
     pherom = pheromone.Pheromon(size_laby, pos_food, alpha, beta)
 
